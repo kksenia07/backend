@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Все сообщения</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 700px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .message {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .message .name {
+            font-weight: bold;
+            color: #2c7be5;
+        }
+        .message .email {
+            color: #666;
+            font-size: 14px;
+        }
+        .message .comment {
+            margin-top: 10px;
+            color: #333;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #2c7be5;
+            text-decoration: none;
+        }
+        .empty {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+        }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-link">← Назад к форме</a>
+    <h1>Все сообщения</h1>
+    <div id="messages"></div>
+
+    <script>
+        fetch('/api/messages')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('messages');
+                if (!data || Object.keys(data).length === 0) {
+                    container.innerHTML = '<div class="empty">Сообщений пока нет</div>';
+                    return;
+                }
+                const messages = Array.isArray(data) ? data : [data];
+                messages.forEach(msg => {
+                    const div = document.createElement('div');
+                    div.className = 'message';
+                    div.innerHTML = `
+                        <div class="name">${msg.name || 'Без имени'}</div>
+                        <div class="email">${msg.email || 'Без email'}</div>
+                        <div class="comment">${msg.comment || 'Без комментария'}</div>
+                    `;
+                    container.appendChild(div);
+                });
+            })
+            .catch(error => {
+                document.getElementById('messages').innerHTML =
+                    '<div class="empty">Ошибка загрузки данных</div>';
+            });
+    </script>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Форма обратной связи</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #c48080;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        
+        button {
+            background-color: #ab765c;
+            color: rgb(255, 255, 255);
+            padding: 12px 30px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background-color: #b3008f;
+        }
+        
+        .error {
+            color: #f40119;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+        
+        .success {
+            color: #28b449;
+            font-size: 16px;
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #ffffff;
+            border-radius: 4px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Форма обратной связи</h1>
+    
+    <form id="feedbackForm">
+        <div class="form-group">
+            <label for="name">Имя:</label>
+            <input type="text" id="name" name="name">
+            <div class="error" id="nameError">Пожалуйста, введите ваше имя</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email">
+            <div class="error" id="emailError">Пожалуйста, введите корректный email</div>
+        </div>
+        
+        <div class="form-group">
+            <label for="comment">Комментарий:</label>
+            <textarea id="comment" name="comment"></textarea>
+            <div class="error" id="commentError">Пожалуйста, введите ваш комментарий</div>
+        </div>
+        
+        <button type="submit">Отправить</button>
+    </form>
+    
+    <div class="success" id="successMessage"></div>
+<p style="text-align: center; margin-top: 20px;">
+    <a href="/backform.html" style="color: #2c7be5;">
+        Посмотреть все сообщения →
+    </a>
+</p>
+    <script>
+        document.getElementById('feedbackForm').addEventListener('submit', function(event) {
+            event.preventDefault(); // Предотвращаем отправку формы
+            
+            // Получаем значения полей
+            const name = document.getElementById('name').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const comment = document.getElementById('comment').value.trim();
+            
+            // Скрываем все сообщения об ошибках
+            hideAllErrors();
+            
+            // Проверяем валидность
+            let isValid = true;
+            
+            // Проверка имени
+            if (name === '') {
+                showError('nameError', 'Пожалуйста, введите ваше имя');
+                isValid = false;
+            }
+            
+            // Проверка email
+            if (email === '') {
+                showError('emailError', 'Пожалуйста, введите email');
+                isValid = false;
+            } else if (!isValidEmail(email)) {
+                showError('emailError', 'Пожалуйста, введите корректный email');
+                isValid = false;
+            }
+            
+            // Проверка комментария
+            if (comment === '') {
+                showError('commentError', 'Пожалуйста, введите ваш комментарий');
+                isValid = false;
+            }
+            console.log('Имя:', name, 'Email:', email, 'Комментарий:', comment);
+            // Если все данные валидны
+            if (isValid) {showSuccessMessage(name, email, comment);
+            }
+        });
+        
+        // Функция для проверки валидности email
+        function isValidEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+        
+        // Функция для показа сообщения об ошибке
+        function showError(errorId, message) {
+            const errorElement = document.getElementById(errorId);
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
+        
+        // Функция для скрытия всех сообщений об ошибках
+        function hideAllErrors() {
+            const errorElements = document.querySelectorAll('.error');
+            errorElements.forEach(element => {
+                element.style.display = 'none';
+            });
+            
+            // Скрываем сообщение об успехе
+            document.getElementById('successMessage').style.display = 'none';
+        }
+        
+        // Функция для показа сообщения об успешной отправке
+        function showSuccessMessage(name, email, comment) {
+  console.log('Отправляем на сервер:', { name, email, comment });
+  
+  fetch('/submit', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name: name,
+      email: email,
+      comment: comment
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    console.log('Сервер ответил:', data);
+  })
+  .catch(error => {
+    console.error('Ошибка отправки:', error);
+  });
+
+  const successElement = document.getElementById('successMessage');
+  successElement.innerHTML = `
+    <strong>Спасибо за ваше сообщение!</strong><br><br>
+    <strong>Имя:</strong> ${name}<br>
+    <strong>Email:</strong> ${email}<br>
+    <strong>Комментарий:</strong> ${comment}
+  `;
+  successElement.style.display = 'block';
+  document.getElementById('feedbackForm').reset();
+}
+    </script>
+</body>
+</html>
