@@ -2,16 +2,29 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+const { Pool } = require('pg');
 
-const PORT = 3000;
-const DATA_FILE = path.join(__dirname, 'data.json');
+const PORT = process.env.PORT || 3000;
 
-// Если файла data.json ещё нет — создаём пустой массив
-if (!fs.existsSync(DATA_FILE)) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify([]));
-}
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost')
+    ? { rejectUnauthorized: false }
+    : false
+});
 
-const server = http.createServer((req, res) => {
+// создаём таблицу, если её ещё нет
+pool.query(`
+  CREATE TABLE IF NOT EXISTS messages (
+    id SERIAL PRIMARY KEY,
+    name TEXT,
+    email TEXT,
+    comment TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+  )
+`).catch(err => console.error('Ошибка создания таблицы:', err));
+
+const server = http.createServer(async (req, res) => {
   const parsedUrl = url.parse(req.url, true);
   const pathname = parsedUrl.pathname;
   const method = req.method;
@@ -30,42 +43,52 @@ const server = http.createServer((req, res) => {
   }
 
   // === Обработка отправки формы (POST) ===
-  // === Обработка отправки формы (POST) ===
-if (pathname === '/submit' && method === 'POST') {
+  if (pathname === '/submit' && method === 'POST') {
     let body = '';
     req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
-        try {
-            // Парсим JSON данные
-            const data = JSON.parse(body);
-            const message = {
-                name:    data.name    || '',
-                email:   data.email   || '',
-                comment: data.comment || '',
-                date:    new Date().toLocaleString('ru-RU')
-            };
+    req.on('end', async () => {
+      try {
+        // Парсим JSON данные
+        const data = JSON.parse(body);
+        const message = {
+          name:    data.name    || '',
+          email:   data.email   || '',
+          comment: data.comment || ''
+        };
 
-            // Читаем существующие данные, добавляем новое сообщение, сохраняем
-            const messages = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
-            messages.push(message);
-            fs.writeFileSync(DATA_FILE, JSON.stringify(messages, null, 2));
+        // Сохраняем сообщение в базу данных
+        await pool.query(
+          'INSERT INTO messages (name, email, comment) VALUES ($1, $2, $3)',
+          [message.name, message.email, message.comment]
+        );
 
-            // Отправляем JSON ответ
-            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({ success: true, message: 'Сообщение сохранено' }));
-        } catch (err) {
-            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({ error: err.message }));
-        }
+        // Отправляем JSON ответ
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: true, message: 'Сообщение сохранено' }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
     });
     return;
-}
+  }
 
   // === API: получить все сообщения (для backform.html через fetch) ===
   if (pathname === '/api/messages' && method === 'GET') {
-    const data = fs.readFileSync(DATA_FILE, 'utf-8');
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(data);
+    try {
+      const result = await pool.query('SELECT * FROM messages ORDER BY id ASC');
+      const messages = result.rows.map(r => ({
+        name: r.name,
+        email: r.email,
+        comment: r.comment,
+        date: new Date(r.created_at).toLocaleString('ru-RU')
+      }));
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(messages));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
     return;
   }
 
